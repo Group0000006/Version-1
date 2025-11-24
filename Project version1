@@ -4,18 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WRAP EAT PIZZA - FULL MENU | Online Ordering</title>
-    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load Inter Font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
-    <!-- Firebase Imports -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        // Expose Firebase services globally for use in the main script block
         window.firebase = {
             initializeApp,
             getAuth,
@@ -39,19 +35,18 @@
         };
     </script>
     <style>
-        /* Custom styles to enforce the aesthetic */
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f8f8f8; /* Off-white background for the overall site */
+            background-color: #f8f8f8; 
         }
         .header-bg {
-            background-color: #1a1a1a; /* Dark Black */
+            background-color: #1a1a1a; 
         }
         .accent-red {
-            background-color: #dc2626; /* Red-700 */
+            background-color: #dc2626;
         }
         .accent-red-text {
-            color: #dc2626; /* Red-700 */
+            color: #dc2626; 
         }
         .menu-card {
             transition: transform 0.2s, box-shadow 0.2s;
@@ -64,19 +59,18 @@
             transition: background-color 0.15s, transform 0.1s;
         }
         .order-button:hover:not(:disabled) {
-            background-color: #b91c1c; /* Red-800 */
+            background-color: #b91c1c; 
             transform: translateY(-1px);
         }
         .order-button:disabled {
-            background-color: #fca5a5; /* Red-300 */
+            background-color: #fca5a5; 
             cursor: not-allowed;
         }
-        /* Style for the scrollbar on webkit browsers */
         .overflow-y-scroll::-webkit-scrollbar {
             width: 8px;
         }
         .overflow-y-scroll::-webkit-scrollbar-thumb {
-            background-color: #dc2626; /* Red-700 */
+            background-color: #dc2626; 
             border-radius: 4px;
         }
         .overflow-y-scroll::-webkit-scrollbar-track {
@@ -85,7 +79,6 @@
     </style>
 </head>
 <body>
-    <!-- Main Header -->
     <header class="header-bg text-white shadow-lg sticky top-0 z-10">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center">
             <h1 class="text-3xl font-extrabold tracking-tight">
@@ -102,27 +95,20 @@
         </div>
     </header>
 
-    <!-- Main Content Layout -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:flex-row gap-8">
-        <!-- Left Column: Menu Display -->
         <section id="menu-container" class="lg:w-2/3 w-full">
             <h2 class="text-4xl font-extrabold text-gray-900 mb-6 accent-red-text">Our Full Menu</h2>
-            <!-- Menu categories will be rendered here by JavaScript -->
         </section>
 
-        <!-- Right Column: Cart and Order Form -->
         <aside class="lg:w-1/3 w-full sticky lg:top-24 h-fit">
             <div class="bg-white p-6 rounded-xl shadow-2xl border-2 border-red-500">
                 <h2 class="text-2xl font-bold text-gray-900 mb-4 flex justify-between items-center">
                     Your Cart <span id="cart-item-count" class="text-sm font-normal text-red-500"></span>
                 </h2>
                 
-                <!-- Cart Items List -->
                 <div id="cart-items-container" class="space-y-4 max-h-96 overflow-y-scroll mb-4 pr-2">
-                    <!-- Cart items will be rendered here -->
                 </div>
 
-                <!-- Cart Summary -->
                 <div class="border-t border-gray-200 pt-4 space-y-2">
                     <div class="flex justify-between font-semibold text-gray-700">
                         <span>Subtotal</span>
@@ -134,7 +120,6 @@
                     </div>
                 </div>
 
-                <!-- Order Details Form -->
                 <form id="order-form" class="mt-6 space-y-4">
                     <input type="text" id="customer-name" placeholder="Your Name" required
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150">
@@ -151,21 +136,18 @@
                 </form>
             </div>
             
-            <!-- User ID for Multi-user context -->
             <div class="mt-4 p-3 bg-gray-100 rounded-lg text-sm text-gray-600">
                 <p>User ID: <span id="user-id" class="font-mono text-xs break-all">Authenticating...</span></p>
             </div>
         </aside>
     </main>
 
-    <!-- Modal for Item Configuration (Quantity and Comment) -->
     <div id="config-modal-overlay" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 transition-opacity duration-300">
         <div id="config-modal-content" class="bg-white rounded-xl shadow-2xl p-6 w-11/12 max-w-lg transform scale-95 opacity-0 transition-all duration-300">
             <h3 class="text-2xl font-bold mb-4 accent-red-text" id="modal-item-name"></h3>
             <p class="text-xl font-semibold text-gray-800 mb-4" id="modal-item-price"></p>
             
             <form id="config-form" onsubmit="event.preventDefault(); addConfiguredItemToCart();">
-                <!-- Quantity Input -->
                 <div class="mb-4">
                     <label for="modal-quantity" class="block text-gray-700 font-medium mb-2">Quantity</label>
                     <div class="flex items-center space-x-3">
@@ -176,20 +158,17 @@
                     </div>
                 </div>
 
-                <!-- Options/Description -->
                 <div id="modal-options-container" class="mb-4 hidden p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
                     <p class="font-semibold mb-1">Options/Notes:</p>
                     <p id="modal-options-text"></p>
                 </div>
                 
-                <!-- Comment/Note Input -->
                 <div class="mb-6">
                     <label for="modal-comment" class="block text-gray-700 font-medium mb-2">Special Instructions/Comments (Optional)</label>
                     <textarea id="modal-comment" name="comment" rows="3" placeholder="e.g. Extra sauce, no onions, pizza flavors for 2-in-1, etc."
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150"></textarea>
                 </div>
 
-                <!-- Action Buttons -->
                 <div class="flex justify-end space-x-3">
                     <button type="button" onclick="closeConfigModal()" class="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition">Cancel</button>
                     <button type="submit" class="px-6 py-2 accent-red text-white font-bold rounded-lg hover:bg-red-800 transition">
@@ -198,7 +177,6 @@
                 </div>
             </form>
             
-            <!-- Hidden inputs to hold item data -->
             <input type="hidden" id="modal-item-id">
             <input type="hidden" id="modal-item-base-price">
             <input type="hidden" id="modal-item-description">
@@ -206,11 +184,9 @@
     </div>
 
 
-    <!-- Success/Error Modal (Existing) -->
     <div id="modal-overlay" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 transition-opacity duration-300">
         <div id="modal-content" class="bg-white rounded-xl shadow-2xl p-8 w-11/12 max-w-md text-center transform scale-95 opacity-0 transition-all duration-300">
             <div id="modal-icon" class="text-6xl text-green-500 mb-4">
-                <!-- Checkmark icon -->
                 <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             </div>
             <h3 class="text-xl font-bold mb-2" id="modal-title">Order Placed!</h3>
@@ -223,20 +199,16 @@
 
 
     <script>
-        // --- FIREBASE INITIALIZATION AND AUTH ---
         let app, db, auth, userId = 'guest';
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         
-        // Define collection paths
         const ORDERS_COLLECTION = `/artifacts/${appId}/public/data/orders`;
 
-        // Cart state
-        let cart = []; // Array of { itemId, name, price, quantity, comment, timestamp }
-        let orderMode = 'TAKE_OUT'; // DINE_IN or TAKE_OUT
+        let cart = [];
+        let orderMode = 'TAKE_OUT'; 
 
-        // DOM elements
         const menuContainerEl = document.getElementById('menu-container');
         const cartItemsContainerEl = document.getElementById('cart-items-container');
         const cartSubtotalEl = document.getElementById('cart-subtotal');
@@ -248,7 +220,6 @@
         const modalContentEl = document.getElementById('modal-content');
         const orderModeTextEl = document.getElementById('order-mode-text');
 
-        // Config Modal DOM Elements
         const configModalOverlayEl = document.getElementById('config-modal-overlay');
         const configModalContentEl = document.getElementById('config-modal-content');
         const modalItemNameEl = document.getElementById('modal-item-name');
@@ -260,7 +231,6 @@
         const modalOptionsContainerEl = document.getElementById('modal-options-container');
         const modalOptionsTextEl = document.getElementById('modal-options-text');
 
-        // --- MENU DATA ---
         const menuData = [
             {
                 category: "SULIT RICE MEALS",
@@ -446,13 +416,11 @@
             },
         ];
 
-        // Create a flat map for quick item lookups
         const menuMap = menuData.flatMap(cat => cat.items).reduce((acc, item) => {
             acc[item.id] = item;
             return acc;
         }, {});
 
-        // --- AUTHENTICATION FUNCTIONS ---
         async function initializeFirebase() {
             if (!firebaseConfig) {
                 console.error("Firebase config is missing.");
@@ -460,7 +428,6 @@
             }
 
             try {
-                // Set Firestore log level for debugging
                 window.firebase.setLogLevel('debug');
                 
                 app = window.firebase.initializeApp(firebaseConfig);
@@ -477,8 +444,6 @@
                     if (user) {
                         userId = user.uid;
                         document.getElementById('user-id').textContent = userId;
-                        // Start listening for cart updates from Firestore
-                        // We'll use a local cart state for a quicker feel, and save the cart when an order is placed.
                     } else {
                         userId = 'guest-' + (crypto.randomUUID ? crypto.randomUUID() : 'default-id');
                         document.getElementById('user-id').textContent = userId + ' (Guest)';
@@ -490,12 +455,10 @@
             }
         }
 
-        // --- ORDERING MODE ---
         function setOrderMode(mode) {
             orderMode = mode;
             orderModeTextEl.textContent = `Ordering Mode: ${mode.replace('_', '-')}`;
 
-            // Update button styles
             document.getElementById('mode-dinein').classList.remove('bg-red-700', 'hover:bg-red-500');
             document.getElementById('mode-dinein').classList.add('bg-gray-700', 'hover:bg-red-500');
             document.getElementById('mode-takeout').classList.remove('bg-red-700', 'hover:bg-red-500');
@@ -513,7 +476,6 @@
             checkOrderButtonStatus();
         }
 
-        // --- MENU RENDERING ---
         function renderMenu() {
             menuContainerEl.innerHTML = menuData.map(category => `
                 <div class="mb-8">
@@ -539,25 +501,20 @@
             `).join('');
         }
 
-        // --- ITEM CONFIGURATION MODAL ---
 
         function openConfigModal(itemId) {
             const item = menuMap[itemId];
             if (!item) return;
 
-            // Set modal content
             modalItemNameEl.textContent = item.name;
             modalItemPriceEl.textContent = `Price: P ${item.price.toFixed(2)}`;
             
-            // Set hidden inputs for use in addConfiguredItemToCart
             modalItemIdInput.value = item.id;
             modalItemBasePriceInput.value = item.price;
             
-            // Reset quantity and comment
             modalQuantityInput.value = 1;
             modalCommentInput.value = item.description || '';
 
-            // Handle optional description/options box
             if (item.description || (item.options && item.options.length > 0)) {
                 modalOptionsContainerEl.classList.remove('hidden');
                 let optionsText = item.description || '';
@@ -570,7 +527,6 @@
             }
 
 
-            // Show modal
             configModalOverlayEl.classList.remove('hidden');
             configModalOverlayEl.classList.add('flex');
             setTimeout(() => {
@@ -580,13 +536,12 @@
         }
 
         function closeConfigModal() {
-            // Animate out
             configModalContentEl.classList.remove('scale-100', 'opacity-100');
             configModalContentEl.classList.add('scale-95', 'opacity-0');
             setTimeout(() => {
                 configModalOverlayEl.classList.add('hidden');
                 configModalOverlayEl.classList.remove('flex');
-            }, 300); // Match transition duration
+            }, 300); 
         }
         
         function changeQuantity(delta) {
@@ -609,14 +564,12 @@
             const comment = modalCommentInput.value.trim();
 
             if (quantity < 1) {
-                // This should be prevented by min="1", but as a safeguard:
                 alert('Quantity must be at least 1.');
                 return;
             }
             
-            // Create a new unique item in the cart to allow for different comments
             const cartItem = {
-                cartId: crypto.randomUUID(), // Unique ID for this specific cart entry
+                cartId: crypto.randomUUID(), 
                 itemId: item.id,
                 name: item.name,
                 price: item.price,
@@ -630,7 +583,6 @@
             closeConfigModal();
         }
 
-        // --- CART MANAGEMENT ---
         function removeFromCart(cartId) {
             cart = cart.filter(item => item.cartId !== cartId);
             updateCartDisplay();
@@ -638,7 +590,6 @@
 
         function calculateTotals() {
             let subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-            // No tax or delivery fees applied for simplicity in this version
             let total = subtotal; 
             return { subtotal, total };
         }
@@ -646,12 +597,12 @@
         function updateCartDisplay() {
             const { subtotal, total } = calculateTotals();
             
-            cartItemsContainerEl.innerHTML = ''; // Clear previous items
+            cartItemsContainerEl.innerHTML = '';
 
             if (cart.length === 0) {
                 cartItemsContainerEl.innerHTML = '<p class="text-center text-gray-500 py-4">Your cart is empty.</p>';
             } else {
-                cart.sort((a, b) => a.timestamp - b.timestamp); // Sort by time added
+                cart.sort((a, b) => a.timestamp - b.timestamp);
 
                 cart.forEach(item => {
                     const itemTotal = (item.price * item.quantity).toFixed(2);
@@ -675,7 +626,6 @@
                 });
             }
 
-            // Update summary
             cartSubtotalEl.textContent = `P ${subtotal.toFixed(2)}`;
             cartTotalEl.textContent = `P ${total.toFixed(2)}`;
             cartItemCountEl.textContent = `(${cart.length} item${cart.length !== 1 ? 's' : ''})`;
@@ -692,7 +642,6 @@
             placeOrderButtonEl.disabled = !(isCartNotEmpty && nameFilled && contactFilled && addressFilled);
         }
 
-        // --- ORDER PLACEMENT AND FIREBASE INTERACTION ---
 
         async function placeOrder(event) {
             event.preventDefault();
@@ -718,7 +667,7 @@
                     name: item.name,
                     price: item.price,
                     quantity: item.quantity,
-                    comment: item.comment || null, // Ensure comment is included
+                    comment: item.comment || null,
                     totalItemPrice: item.price * item.quantity
                 })),
                 subtotal: subtotal,
@@ -728,23 +677,19 @@
             };
 
             try {
-                // 1. Add order to the 'orders' collection
                 await window.firebase.addDoc(window.firebase.collection(db, ORDERS_COLLECTION), orderData);
 
-                // 2. Show success modal
                 document.getElementById('modal-title').textContent = 'Order Placed!';
                 document.getElementById('modal-message').textContent = `Thank you, ${customerName}! Your ${orderMode.replace('_', '-')} order (P ${total.toFixed(2)}) has been submitted to the kitchen.`;
                 document.getElementById('modal-icon').innerHTML = '<svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
                 
                 showModal();
 
-                // 3. Clear the cart and reset form after placing the order
                 cart = [];
                 orderForm.reset();
                 updateCartDisplay();
             } catch (e) {
                 console.error("Error placing order:", e);
-                // Show error modal
                 document.getElementById('modal-title').textContent = 'Order Failed';
                 document.getElementById('modal-message').textContent = 'An error occurred while submitting your order. Please check your connection and try again.';
                 document.getElementById('modal-icon').innerHTML = '<svg class="w-16 h-16 mx-auto text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
@@ -755,43 +700,34 @@
             }
         }
 
-        /**
-         * Displays the confirmation modal with animation.
-         */
+        
         function showModal() {
             modalOverlayEl.classList.remove('hidden');
             modalOverlayEl.classList.add('flex');
-            // Animate in
             setTimeout(() => {
                 modalContentEl.classList.remove('scale-95', 'opacity-0');
                 modalContentEl.classList.add('scale-100', 'opacity-100');
             }, 10);
         }
 
-        /**
-         * Closes the confirmation modal with animation.
-         */
+        
         function closeModal() {
-            // Animate out
             modalContentEl.classList.remove('scale-100', 'opacity-100');
             modalContentEl.classList.add('scale-95', 'opacity-0');
             setTimeout(() => {
                 modalOverlayEl.classList.add('hidden');
                 modalOverlayEl.classList.remove('flex');
-            }, 300); // Match transition duration
+            }, 300); 
         }
 
-        // --- INITIALIZATION ---
         window.onload = () => {
             initializeFirebase();
             renderMenu();
-            setOrderMode('TAKE_OUT'); // Default mode
+            setOrderMode('TAKE_OUT'); 
 
-            // Listen for changes in form fields to update button status
             orderForm.addEventListener('input', checkOrderButtonStatus);
             orderForm.addEventListener('submit', placeOrder);
 
-            // Export functions to window scope for inline HTML event handlers to work
             window.removeFromCart = removeFromCart;
             window.closeModal = closeModal;
             window.setOrderMode = setOrderMode; 
