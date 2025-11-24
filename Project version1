@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WRAP EAT PIZZA - FULL MENU | Online Ordering</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <!-- Firebase Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Expose Firebase services globally for use in the main script block
+        window.firebase = {
+            initializeApp,
+            getAuth,
+            signInAnonymously,
+            signInWithCustomToken,
+            onAuthStateChanged,
+            getFirestore,
+            doc,
+            getDoc,
+            addDoc,
+            setDoc,
+            updateDoc,
+            deleteDoc,
+            onSnapshot,
+            collection,
+            query,
+            where,
+            getDocs,
+            serverTimestamp,
+            setLogLevel
+        };
+    </script>
+    <style>
+        /* Custom styles to enforce the aesthetic */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f8f8; /* Off-white background for the overall site */
+        }
+        .header-bg {
+            background-color: #1a1a1a; /* Dark Black */
+        }
+        .accent-red {
+            background-color: #dc2626; /* Red-700 */
+        }
+        .accent-red-text {
+            color: #dc2626; /* Red-700 */
+        }
+        .menu-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .menu-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(220, 38, 38, 0.3), 0 4px 6px -2px rgba(220, 38, 38, 0.2);
+        }
+        .order-button {
+            transition: background-color 0.15s, transform 0.1s;
+        }
+        .order-button:hover:not(:disabled) {
+            background-color: #b91c1c; /* Red-800 */
+            transform: translateY(-1px);
+        }
+        .order-button:disabled {
+            background-color: #fca5a5; /* Red-300 */
+            cursor: not-allowed;
+        }
+        /* Style for the scrollbar on webkit browsers */
+        .overflow-y-scroll::-webkit-scrollbar {
+            width: 8px;
+        }
+        .overflow-y-scroll::-webkit-scrollbar-thumb {
+            background-color: #dc2626; /* Red-700 */
+            border-radius: 4px;
+        }
+        .overflow-y-scroll::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+    </style>
+</head>
+<body>
+    <!-- Main Header -->
+    <header class="header-bg text-white shadow-lg sticky top-0 z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center">
+            <h1 class="text-3xl font-extrabold tracking-tight">
+                WRAP EAT PIZZA <span class="accent-red-text text-xl">| Online Order</span>
+            </h1>
+            <div id="order-mode-selector" class="mt-2 sm:mt-0 space-x-4">
+                <button onclick="setOrderMode('DINE_IN')" id="mode-dinein" class="px-3 py-1 text-sm font-medium rounded-full transition-colors bg-gray-700 hover:bg-red-500">
+                    <span class="font-bold">DINE-IN</span>
+                </button>
+                <button onclick="setOrderMode('TAKE_OUT')" id="mode-takeout" class="px-3 py-1 text-sm font-medium rounded-full transition-colors bg-red-700 hover:bg-red-500">
+                    <span class="font-bold">TAKE-OUT</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:flex-row gap-8">
+        <!-- Left Column: Menu Display -->
+        <section id="menu-container" class="lg:w-2/3 w-full">
+            <h2 class="text-4xl font-extrabold text-gray-900 mb-6 accent-red-text">Our Full Menu</h2>
+            <!-- Menu categories will be rendered here by JavaScript -->
+        </section>
+
+        <!-- Right Column: Cart and Order Form -->
+        <aside class="lg:w-1/3 w-full sticky lg:top-24 h-fit">
+            <div class="bg-white p-6 rounded-xl shadow-2xl border-2 border-red-500">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex justify-between items-center">
+                    Your Cart <span id="cart-item-count" class="text-sm font-normal text-red-500"></span>
+                </h2>
+                
+                <!-- Cart Items List -->
+                <div id="cart-items-container" class="space-y-4 max-h-96 overflow-y-scroll mb-4 pr-2">
+                    <!-- Cart items will be rendered here -->
+                </div>
+
+                <!-- Cart Summary -->
+                <div class="border-t border-gray-200 pt-4 space-y-2">
+                    <div class="flex justify-between font-semibold text-gray-700">
+                        <span>Subtotal</span>
+                        <span id="cart-subtotal">P 0.00</span>
+                    </div>
+                    <div class="flex justify-between font-bold text-lg accent-red-text">
+                        <span>TOTAL</span>
+                        <span id="cart-total">P 0.00</span>
+                    </div>
+                </div>
+
+                <!-- Order Details Form -->
+                <form id="order-form" class="mt-6 space-y-4">
+                    <input type="text" id="customer-name" placeholder="Your Name" required
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150">
+                    <input type="tel" id="contact-number" placeholder="Contact Number" required
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150">
+                    <textarea id="delivery-address" placeholder="Delivery Address / Table No. (Required)" required
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 h-20"></textarea>
+
+                    <button type="submit" id="place-order-button" disabled
+                        class="order-button w-full accent-red text-white font-bold py-3 rounded-xl text-lg shadow-md hover:shadow-xl transition-all">
+                        Place Order
+                    </button>
+                    <p id="order-mode-text" class="text-center text-sm text-gray-500 font-medium">Ordering Mode: Take-Out</p>
+                </form>
+            </div>
+            
+            <!-- User ID for Multi-user context -->
+            <div class="mt-4 p-3 bg-gray-100 rounded-lg text-sm text-gray-600">
+                <p>User ID: <span id="user-id" class="font-mono text-xs break-all">Authenticating...</span></p>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Modal for Item Configuration (Quantity and Comment) -->
+    <div id="config-modal-overlay" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 transition-opacity duration-300">
+        <div id="config-modal-content" class="bg-white rounded-xl shadow-2xl p-6 w-11/12 max-w-lg transform scale-95 opacity-0 transition-all duration-300">
+            <h3 class="text-2xl font-bold mb-4 accent-red-text" id="modal-item-name"></h3>
+            <p class="text-xl font-semibold text-gray-800 mb-4" id="modal-item-price"></p>
+            
+            <form id="config-form" onsubmit="event.preventDefault(); addConfiguredItemToCart();">
+                <!-- Quantity Input -->
+                <div class="mb-4">
+                    <label for="modal-quantity" class="block text-gray-700 font-medium mb-2">Quantity</label>
+                    <div class="flex items-center space-x-3">
+                        <button type="button" onclick="changeQuantity(-1)" class="p-2 border border-gray-300 rounded-lg text-lg font-bold hover:bg-gray-100 transition">-</button>
+                        <input type="number" id="modal-quantity" name="quantity" value="1" min="1" required
+                            class="w-20 text-center px-3 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500">
+                        <button type="button" onclick="changeQuantity(1)" class="p-2 border border-gray-300 rounded-lg text-lg font-bold hover:bg-gray-100 transition">+</button>
+                    </div>
+                </div>
+
+                <!-- Options/Description -->
+                <div id="modal-options-container" class="mb-4 hidden p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                    <p class="font-semibold mb-1">Options/Notes:</p>
+                    <p id="modal-options-text"></p>
+                </div>
+                
+                <!-- Comment/Note Input -->
+                <div class="mb-6">
+                    <label for="modal-comment" class="block text-gray-700 font-medium mb-2">Special Instructions/Comments (Optional)</label>
+                    <textarea id="modal-comment" name="comment" rows="3" placeholder="e.g. Extra sauce, no onions, pizza flavors for 2-in-1, etc."
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150"></textarea>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="closeConfigModal()" class="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition">Cancel</button>
+                    <button type="submit" class="px-6 py-2 accent-red text-white font-bold rounded-lg hover:bg-red-800 transition">
+                        Confirm & Add to Cart
+                    </button>
+                </div>
+            </form>
+            
+            <!-- Hidden inputs to hold item data -->
+            <input type="hidden" id="modal-item-id">
+            <input type="hidden" id="modal-item-base-price">
+            <input type="hidden" id="modal-item-description">
+        </div>
+    </div>
+
+
+    <!-- Success/Error Modal (Existing) -->
+    <div id="modal-overlay" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 transition-opacity duration-300">
+        <div id="modal-content" class="bg-white rounded-xl shadow-2xl p-8 w-11/12 max-w-md text-center transform scale-95 opacity-0 transition-all duration-300">
+            <div id="modal-icon" class="text-6xl text-green-500 mb-4">
+                <!-- Checkmark icon -->
+                <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <h3 class="text-xl font-bold mb-2" id="modal-title">Order Placed!</h3>
+            <p id="modal-message" class="text-gray-600 mb-6">Your order has been successfully placed. We will process it shortly!</p>
+            <button onclick="closeModal()" class="accent-red text-white font-bold py-2 px-6 rounded-lg hover:bg-red-800 transition">
+                Close
+            </button>
+        </div>
+    </div>
+
+
+    <script>
+        // --- FIREBASE INITIALIZATION AND AUTH ---
+        let app, db, auth, userId = 'guest';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // Define collection paths
+        const ORDERS_COLLECTION = `/artifacts/${appId}/public/data/orders`;
+
+        // Cart state
+        let cart = []; // Array of { itemId, name, price, quantity, comment, timestamp }
+        let orderMode = 'TAKE_OUT'; // DINE_IN or TAKE_OUT
+
+        // DOM elements
+        const menuContainerEl = document.getElementById('menu-container');
+        const cartItemsContainerEl = document.getElementById('cart-items-container');
+        const cartSubtotalEl = document.getElementById('cart-subtotal');
+        const cartTotalEl = document.getElementById('cart-total');
+        const cartItemCountEl = document.getElementById('cart-item-count');
+        const placeOrderButtonEl = document.getElementById('place-order-button');
+        const orderForm = document.getElementById('order-form');
+        const modalOverlayEl = document.getElementById('modal-overlay');
+        const modalContentEl = document.getElementById('modal-content');
+        const orderModeTextEl = document.getElementById('order-mode-text');
+
+        // Config Modal DOM Elements
+        const configModalOverlayEl = document.getElementById('config-modal-overlay');
+        const configModalContentEl = document.getElementById('config-modal-content');
+        const modalItemNameEl = document.getElementById('modal-item-name');
+        const modalItemPriceEl = document.getElementById('modal-item-price');
+        const modalQuantityInput = document.getElementById('modal-quantity');
+        const modalCommentInput = document.getElementById('modal-comment');
+        const modalItemIdInput = document.getElementById('modal-item-id');
+        const modalItemBasePriceInput = document.getElementById('modal-item-base-price');
+        const modalOptionsContainerEl = document.getElementById('modal-options-container');
+        const modalOptionsTextEl = document.getElementById('modal-options-text');
+
+        // --- MENU DATA ---
+        const menuData = [
+            {
+                category: "SULIT RICE MEALS",
+                items: [
+                    { id: "rm-rcr", name: "Roasted Chicken with Rice", price: 99, description: "Classic favorite." },
+                    { id: "rm-sr", name: "Shawarma Rice", price: 119, description: "Savory shawarma strips on rice." },
+                    { id: "rm-fcr", name: "Fried Chicken with Rice", price: 109, description: "Crispy fried chicken." },
+                    { id: "rm-psr", name: "Pork Sisig with Rice", price: 119, description: "Authentic sisig flavor." },
+                    { id: "rm-ncr", name: "Chicken Nuggets with Rice", price: 119, description: "Specify flavor in comments.", options: ["Garlic Parmesan", "Honey BBQ", "Jalapeño Cheddar", "Buffalo", "Classic", "Honey Mustard"] },
+                ]
+            },
+            {
+                category: "DRINKS",
+                items: [
+                    { id: "d-ic", name: "Iced Coffee", price: 95, description: "Chilled caffeine boost." },
+                    { id: "d-bl-glass", name: "Blue Lemonade (Glass)", price: 25 },
+                    { id: "d-bl-pitcher", name: "Blue Lemonade (Pitcher)", price: 99 },
+                    { id: "d-it-glass", name: "Iced Tea (Glass)", price: 25 },
+                    { id: "d-it-pitcher", name: "Iced Tea (Pitcher)", price: 99 },
+                    { id: "d-cj-glass", name: "Cucumber Juice (Glass)", price: 25 },
+                    { id: "d-cj-pitcher", name: "Cucumber Juice (Pitcher)", price: 99 },
+                    { id: "d-mcs", name: "Mango Caramel Shake", price: 100, description: "Sweet and creamy indulgence." },
+                    { id: "d-ss", name: "Strawberry Shake", price: 100, description: "Fruity and refreshing." },
+                    { id: "d-os", name: "Oreo Shake", price: 100, description: "Chocolate cookie goodness." }
+                ]
+            },
+            {
+                category: "RICE TOPPERS (Loaded Meals)",
+                items: [
+                    { id: "rt-bl", name: "Baked Liempo Rice Topper", price: 149, description: "With 1.5 cup rice (Reg/Spicy Java), chicken fingers or fish fillet, veggies, and free drink. Specify choices in comments." },
+                    { id: "rt-sr", name: "Sisig Rice Topper", price: 149, description: "With 1.5 cup rice (Reg/Spicy Java), chicken fingers or fish fillet, veggies, and free drink. Specify choices in comments." },
+                    { id: "rt-rr", name: "Roasted Ribs Rice Topper", price: 249, description: "With 1.5 cup rice (Reg/Spicy Java), roasted ribs, baked potatoes, veggies, and free drink. Specify choices in comments." },
+                    { id: "rt-bpr", name: "Breaded Pork Rice Topper", price: 149, description: "With 1.5 cup rice (Reg/Spicy Java), breaded pork, baked potatoes, veggies, and free drink. Specify choices in comments." },
+                    { id: "rt-fcr", name: "Fried Chicken Rice Topper", price: 149, description: "With 1.5 cup rice (Reg/Spicy Java), fried chicken, baked potatoes, veggies, and free drink. Specify choices in comments." },
+                    { id: "rt-pbr", name: "Pork BBQ Rice Topper", price: 149, description: "With 1.5 cup rice (Reg/Spicy Java), pork BBQ, baked potatoes, veggies, and free drink. Specify choices in comments." },
+                ]
+            },
+            {
+                category: "PIZZA - PREMIUM",
+                items: [
+                    { id: "p-sp-12", name: "Shawarma Pizza (12\")", price: 499 }, { id: "p-sp-16", name: "Shawarma Pizza (16\")", price: 799 },
+                    { id: "p-sizp-12", name: "Sisig Pizza (12\")", price: 499 }, { id: "p-sizp-16", name: "Sisig Pizza (16\")", price: 799 },
+                    { id: "p-cs-12", name: "Creamy Spinach Pizza (12\")", price: 579 }, { id: "p-cs-16", name: "Creamy Spinach Pizza (16\")", price: 919 },
+                    { id: "p-bp-12", name: "Burger Pizza (12\")", price: 429 }, { id: "p-bp-16", name: "Burger Pizza (16\")", price: 699 },
+                    { id: "p-fc-12", name: "Five Cheese Pizza (12\")", price: 399 }, { id: "p-fc-16", name: "Five Cheese Pizza (16\")", price: 659 },
+                ]
+            },
+            {
+                category: "PIZZA - REGULAR",
+                items: [
+                    { id: "pr-h-12", name: "Hawaiian Pizza (12\")", price: 345 }, { id: "pr-h-16", name: "Hawaiian Pizza (16\")", price: 555 },
+                    { id: "pr-o-12", name: "Overload Pizza (12\")", price: 369 }, { id: "pr-o-16", name: "Overload Pizza (16\")", price: 599 },
+                    { id: "pr-foc-12", name: "Four Cheese Pizza (12\")", price: 379 }, { id: "pr-foc-16", name: "Four Cheese Pizza (16\")", price: 615 },
+                    { id: "pr-av-12", name: "All Veggies Pizza (12\")", price: 310 }, { id: "pr-av-16", name: "All Veggies Pizza (16\")", price: 500 },
+                    { id: "pr-hc-12", name: "Ham & Cheese Pizza (12\")", price: 315 }, { id: "pr-hc-16", name: "Ham & Cheese Pizza (16\")", price: 515 },
+                    { id: "pr-p-12", name: "Pepperoni Pizza (12\")", price: 345 }, { id: "pr-p-16", name: "Pepperoni Pizza (16\")", price: 555 },
+                    { id: "pr-cb-12", name: "Cheesy Bacon Pizza (12\")", price: 345 }, { id: "pr-cb-16", name: "Cheesy Bacon Pizza (16\")", price: 555 },
+                    { id: "pr-am-12", name: "All Meat Pizza (12\")", price: 350 }, { id: "pr-am-16", name: "All Meat Pizza (16\")", price: 565 },
+                    { id: "pr-bm-12", name: "Beef & Mushroom Pizza (12\")", price: 360 }, { id: "pr-bm-16", name: "Beef & Mushroom Pizza (16\")", price: 590 },
+                    { id: "pr-cm-12", name: "Creamcheese Margherita Pizza (12\")", price: 400 }, { id: "pr-cm-16", name: "Creamcheese Margherita Pizza (16\")", price: 640 },
+                ]
+            },
+            {
+                category: "PIZZA MIXES",
+                items: [
+                    { id: "pm-2i1-12", name: "2 in 1 Pizza (12\")", price: 470, description: "Specify the two pizza flavors in the comments." },
+                    { id: "pm-2i1-16", name: "2 in 1 Pizza (16\")", price: 755, description: "Specify the two pizza flavors in the comments." },
+                ]
+            },
+            {
+                category: "PASTA",
+                items: [
+                    { id: "pasta-spaghetti-solo", name: "Spaghetti (Solo)", price: 145 }, { id: "pasta-spaghetti-quarter", name: "Spaghetti (Quarter)", price: 265 }, { id: "pasta-spaghetti-half", name: "Spaghetti (Half)", price: 455 }, { id: "pasta-spaghetti-whole", name: "Spaghetti (Whole)", price: 870 },
+                    { id: "pasta-carbonara-solo", name: "Carbonara (Solo)", price: 170 }, { id: "pasta-carbonara-quarter", name: "Carbonara (Quarter)", price: 305 }, { id: "pasta-carbonara-half", name: "Carbonara (Half)", price: 545 }, { id: "pasta-carbonara-whole", name: "Carbonara (Whole)", price: 1035 },
+                    { id: "pasta-bakedmac-solo", name: "Baked Mac (Solo)", price: 160 }, { id: "pasta-bakedmac-quarter", name: "Baked Mac (Quarter)", price: 285 }, { id: "pasta-bakedmac-half", name: "Baked Mac (Half)", price: 530 }, { id: "pasta-bakedmac-whole", name: "Baked Mac (Whole)", price: 990 },
+                    { id: "pasta-lasagna-solo", name: "Lasagna (Solo)", price: 190 }, { id: "pasta-lasagna-quarter", name: "Lasagna (Quarter)", price: 345 }, { id: "pasta-lasagna-half", name: "Lasagna (Half)", price: 645 }, { id: "pasta-lasagna-whole", name: "Lasagna (Whole)", price: 1210 },
+                    { id: "pasta-pancit-solo", name: "Pancit Guisado (Solo)", price: 150 }, { id: "pasta-pancit-quarter", name: "Pancit Guisado (Quarter)", price: 280 }, { id: "pasta-pancit-half", name: "Pancit Guisado (Half)", price: 500 }, { id: "pasta-pancit-whole", name: "Pancit Guisado (Whole)", price: 900 },
+                ]
+            },
+            {
+                category: "CHICKEN",
+                items: [
+                    { id: "c-nuggets", name: "Nuggets", price: 150, description: "Specify flavor in comments.", options: ["Garlic Parmesan", "Honey BBQ", "Jalapeño Cheddar", "Buffalo", "Classic", "Honey Mustard"] },
+                    { id: "c-wings", name: "Wings", price: 225, description: "Specify flavor in comments.", options: ["Garlic Parmesan", "Honey BBQ", "Jalapeño Cheddar", "Buffalo", "Classic", "Honey Mustard"] },
+                ]
+            },
+            {
+                category: "BURGER",
+                items: [
+                    { id: "b-bogo", name: "Buy 1 Get 1 Burger", price: 115, description: "Add P50 for extra cheesy. Specify details/requests in comments." },
+                    { id: "b-bogocfwf", name: "Buy 1 Get 1 Meaty Chicken Burger w/ Fries and Drink", price: 159, description: "Add P50 for extra cheesy. Specify details/requests in comments." },
+                    { id: "b-supreme", name: "Supreme Regular Burger", price: 209, description: "A la carte burger." },
+                    { id: "b-supremecmbo", name: "Supreme Burger w/ Fries or Onion Rings", price: 259, description: "Specify side (Fries or Onion Rings) in comments." },
+                ]
+            },
+            {
+                category: "PASTA COMBO MEALS",
+                items: [
+                    { id: "pc-ppc", name: "PPC (Pasta, Pizza, Chicken)", price: 215, description: "Pizza (4-cheese/Pep/H&C), Pasta (Spag/Carbo/Pancit), Chicken (Original). Specify choices in comments." },
+                    { id: "pc-ppcr", name: "PPCR (PPC + Rice)", price: 230, description: "PPC combo with an additional rice. Specify choices in comments." },
+                ]
+            },
+            {
+                category: "KIDDIE MEAL",
+                items: [
+                    { id: "km-spm", name: "SPM (Spaghetti, Pizza Meal)", price: 89, description: "Pizza choice: Pepperoni, Ham & Cheese. Specify in comments." },
+                    { id: "km-scm", name: "SCM (Spaghetti, Chicken Meal)", price: 99, description: "A kid-friendly spaghetti and chicken combo." },
+                ]
+            },
+            {
+                category: "PICK-A (Ala Carte Snacks)",
+                items: [
+                    { id: "pa-cf", name: "Chicken Fingers", price: 170 },
+                    { id: "pa-ff", name: "French Fries", price: 80 },
+                    { id: "pa-fo", name: "Fries Overload", price: 130 },
+                    { id: "pa-ms", name: "Mozzarella Sticks", price: 120 },
+                    { id: "pa-or", name: "Onion Rings", price: 99 },
+                    { id: "pa-ffil", name: "Fish Fillet", price: 150 },
+                    { id: "pa-jp", name: "Jalapeño Poppers", price: 170 },
+                    { id: "pa-bp", name: "Baked Potato", price: 130 },
+                ]
+            },
+            {
+                category: "PICK ALL-IN",
+                items: [
+                    { id: "pa-allin", name: "Pick All-In Loaded Snacks", price: 759, description: "Includes Chicken fingers, french fries, fries overload, mozzarella sticks, onion rings, fish fillet, and jalapeño poppers." },
+                ]
+            },
+            {
+                category: "FOR ADVANCE ORDER - ULAM TRAYS",
+                items: [
+                    { id: "ut-bl-qt", name: "Baked Liempo Ulam Tray (Quarter)", price: 449 }, { id: "ut-bl-hf", name: "Baked Liempo Ulam Tray (Half)", price: 799 }, { id: "ut-bl-wl", name: "Baked Liempo Ulam Tray (Whole)", price: 1499 },
+                    { id: "ut-be-qt", name: "Bicol Express Ulam Tray (Quarter)", price: 449 }, { id: "ut-be-hf", name: "Bicol Express Ulam Tray (Half)", price: 799 }, { id: "ut-be-wl", name: "Bicol Express Ulam Tray (Whole)", price: 1499 },
+                    { id: "ut-bp-qt", name: "Breaded Pork Ulam Tray (Quarter)", price: 449 }, { id: "ut-bp-hf", name: "Breaded Pork Ulam Tray (Half)", price: 799 }, { id: "ut-bp-wl", name: "Breaded Pork Ulam Tray (Whole)", price: 1499 },
+                    { id: "ut-caldereta-qt", name: "Caldereta Ulam Tray (Quarter)", price: 499 }, { id: "ut-caldereta-hf", name: "Caldereta Ulam Tray (Half)", price: 899 }, { id: "ut-caldereta-wl", name: "Caldereta Ulam Tray (Whole)", price: 1599 },
+                    { id: "ut-cm-qt", name: "Chicken Mustard Ulam Tray (Quarter)", price: 449 }, { id: "ut-cm-hf", name: "Chicken Mustard Ulam Tray (Half)", price: 799 }, { id: "ut-cm-wl", name: "Chicken Mustard Ulam Tray (Whole)", price: 1499 },
+                    { id: "ut-cn-qt", name: "Chicken Nuggets Ulam Tray (Quarter)", price: 449 }, { id: "ut-cn-hf", name: "Chicken Nuggets Ulam Tray (Half)", price: 799 }, { id: "ut-cn-wl", name: "Chicken Nuggets Ulam Tray (Whole)", price: 1499 },
+                    { id: "ut-cs-qt", name: "Chopsuey Ulam Tray (Quarter)", price: 379 }, { id: "ut-cs-hf", name: "Chopsuey Ulam Tray (Half)", price: 699 }, { id: "ut-cs-wl", name: "Chopsuey Ulam Tray (Whole)", price: 1199 },
+                    { id: "ut-fc-qt", name: "Fried Chicken Ulam Tray (Quarter)", price: 449 }, { id: "ut-fc-hf", name: "Fried Chicken Ulam Tray (Half)", price: 699 }, { id: "ut-fc-wl", name: "Fried Chicken Ulam Tray (Whole)", price: 1199 },
+                    { id: "ut-lk-qt", name: "Lechon Kawali Ulam Tray (Quarter)", price: 449 }, { id: "ut-lk-hf", name: "Lechon Kawali Ulam Tray (Half)", price: 799 }, { id: "ut-lk-wl", name: "Lechon Kawali Ulam Tray (Whole)", price: 1499 },
+                    { id: "ut-ps-qt", name: "Pork Steak Ulam Tray (Quarter)", price: 499 }, { id: "ut-ps-hf", name: "Pork Steak Ulam Tray (Half)", price: 899 }, { id: "ut-ps-wl", name: "Pork Steak Ulam Tray (Whole)", price: 1599 },
+                    { id: "ut-sisig-qt", name: "Sisig Ulam Tray (Quarter)", price: 499 }, { id: "ut-sisig-hf", name: "Sisig Ulam Tray (Half)", price: 899 }, { id: "ut-sisig-wl", name: "Sisig Ulam Tray (Whole)", price: 1599 },
+                    { id: "ut-swff-qt", name: "Sweet & Sour Fish Fillet Ulam Tray (Quarter)", price: 579 }, { id: "ut-swff-hf", name: "Sweet & Sour Fish Fillet Ulam Tray (Half)", price: 999 }, { id: "ut-swff-wl", name: "Sweet & Sour Fish Fillet Ulam Tray (Whole)", price: 1899 },
+                    { id: "ut-lumpia-25", name: "Lumpia (25pcs)", price: 255 }, { id: "ut-lumpia-50", name: "Lumpia (50pcs)", price: 399 }, { id: "ut-lumpia-100", name: "Lumpia (100pcs)", price: 699 },
+                ]
+            },
+            {
+                category: "FOR ADVANCE ORDER - RICE PLATTER",
+                items: [
+                    { id: "rp-plain-solo", name: "Plain Rice Platter (Solo)", price: 20 }, { id: "rp-plain-qt", name: "Plain Rice Platter (Quarter)", price: 115 }, { id: "rp-plain-hf", name: "Plain Rice Platter (Half)", price: 215 }, { id: "rp-plain-wl", name: "Plain Rice Platter (Whole)", price: 410 },
+                    { id: "rp-garlic-solo", name: "Garlic Fried Rice Platter (Solo)", price: 30 }, { id: "rp-garlic-qt", name: "Garlic Fried Rice Platter (Quarter)", price: 170 }, { id: "rp-garlic-hf", name: "Garlic Fried Rice Platter (Half)", price: 325 }, { id: "rp-garlic-wl", name: "Garlic Fried Rice Platter (Whole)", price: 615 },
+                ]
+            },
+            {
+                category: "ULAM PLATE (2 Pax)",
+                items: [
+                    { id: "up-bl", name: "Baked Liempo Ulam Plate (2 Pax)", price: 150 },
+                    { id: "up-bp", name: "Breaded Pork Ulam Plate (2 Pax)", price: 150 },
+                    { id: "up-sisig", name: "Sisig Ulam Plate (2 Pax)", price: 160 },
+                    { id: "up-bbq", name: "Pork BBQ Ulam Plate (2 Pax)", price: 160 },
+                ]
+            },
+            {
+                category: "ROASTED MEAT",
+                items: [
+                    { id: "rm-rrc", name: "Roasted Rosemary Chicken (Whole)", price: 359 },
+                    { id: "rm-rsr-half", name: "Roasted Spare Ribs w/ Baked Potato (Half)", price: 999 },
+                    { id: "rm-rsr-whole", name: "Roasted Spare Ribs w/ Baked Potato (Whole)", price: 1899 },
+                ]
+            },
+            {
+                category: "WRAP TREATS (Group Meals)",
+                items: [
+                    { id: "wt-01", name: "Wrap Treat 0.1 (2-3 Pax)", price: 570, description: "1/4 Pancit/Spag, 1/2 Pizza (12\", Any), 1 Nuggets (Any Flavor). Specify choices in comments." },
+                    { id: "wt-02", name: "Wrap Treat 0.2 (2-3 Pax)", price: 605, description: "1/4 Carbo/Baked Mac/Lasagna, 1/2 Pizza (12\", Any), 1 Nuggets (Any Flavor). Specify choices in comments." },
+                    { id: "wt-11", name: "Wrap Treat 1.1 (5-6 Pax)", price: 1215, description: "1/2 Pancit/Spag, 1 Pizza (12\", Regular), 2 Wings (Any Flavor). Specify choices in comments." },
+                    { id: "wt-12", name: "Wrap Treat 1.2 (5-6 Pax)", price: 1290, description: "1/2 Carbo/Baked Mac/Lasagna, 1 Pizza (12\", Regular), 2 Wings (Any Flavor). Specify choices in comments." },
+                    { id: "wt-21", name: "Wrap Treat 2.1 (10-12 Pax)", price: 2375, description: "Whole Pancit/Spag, 2 Pizza (12\", Regular), 4 Wings (Any Flavor). Specify choices in comments." },
+                    { id: "wt-31", name: "Wrap Treat 3.1 (22-24 Pax)", price: 4555, description: "2 Whole Pancit/Spag, 4 Pizza (12\", Regular), 8 Wings (Any Flavor). Specify choices in comments." },
+                    { id: "wt-22", name: "Wrap Treat 2.2 (10-12 Pax)", price: 2515, description: "Whole Carbo/Baked Mac/Lasagna, 2 Pizza (12\", Regular), 4 Wings (Any Flavor). Specify choices in comments." },
+                    { id: "wt-32", name: "Wrap Treat 3.2 (22-24 Pax)", price: 4780, description: "2 Whole Spag/Carbo/Baked Mac, 4 Pizza (12\", Regular), 8 Wings (Any Flavor). Specify choices in comments." },
+                ]
+            },
+        ];
+
+        // Create a flat map for quick item lookups
+        const menuMap = menuData.flatMap(cat => cat.items).reduce((acc, item) => {
+            acc[item.id] = item;
+            return acc;
+        }, {});
+
+        // --- AUTHENTICATION FUNCTIONS ---
+        async function initializeFirebase() {
+            if (!firebaseConfig) {
+                console.error("Firebase config is missing.");
+                return;
+            }
+
+            try {
+                // Set Firestore log level for debugging
+                window.firebase.setLogLevel('debug');
+                
+                app = window.firebase.initializeApp(firebaseConfig);
+                db = window.firebase.getFirestore(app);
+                auth = window.firebase.getAuth(app);
+
+                if (initialAuthToken) {
+                    await window.firebase.signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await window.firebase.signInAnonymously(auth);
+                }
+
+                window.firebase.onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        document.getElementById('user-id').textContent = userId;
+                        // Start listening for cart updates from Firestore
+                        // We'll use a local cart state for a quicker feel, and save the cart when an order is placed.
+                    } else {
+                        userId = 'guest-' + (crypto.randomUUID ? crypto.randomUUID() : 'default-id');
+                        document.getElementById('user-id').textContent = userId + ' (Guest)';
+                    }
+                });
+            } catch (error) {
+                console.error("Firebase initialization or authentication failed:", error);
+                document.getElementById('user-id').textContent = 'Error initializing Firebase';
+            }
+        }
+
+        // --- ORDERING MODE ---
+        function setOrderMode(mode) {
+            orderMode = mode;
+            orderModeTextEl.textContent = `Ordering Mode: ${mode.replace('_', '-')}`;
+
+            // Update button styles
+            document.getElementById('mode-dinein').classList.remove('bg-red-700', 'hover:bg-red-500');
+            document.getElementById('mode-dinein').classList.add('bg-gray-700', 'hover:bg-red-500');
+            document.getElementById('mode-takeout').classList.remove('bg-red-700', 'hover:bg-red-500');
+            document.getElementById('mode-takeout').classList.add('bg-gray-700', 'hover:bg-red-500');
+
+            if (mode === 'TAKE_OUT') {
+                document.getElementById('mode-takeout').classList.remove('bg-gray-700');
+                document.getElementById('mode-takeout').classList.add('bg-red-700');
+                document.getElementById('delivery-address').placeholder = 'Delivery Address (Required)';
+            } else {
+                document.getElementById('mode-dinein').classList.remove('bg-gray-700');
+                document.getElementById('mode-dinein').classList.add('bg-red-700');
+                document.getElementById('delivery-address').placeholder = 'Table Number (Required)';
+            }
+            checkOrderButtonStatus();
+        }
+
+        // --- MENU RENDERING ---
+        function renderMenu() {
+            menuContainerEl.innerHTML = menuData.map(category => `
+                <div class="mb-8">
+                    <h3 class="text-3xl font-extrabold text-gray-800 border-b-4 border-red-500 pb-2 mb-4 mt-8">${category.category}</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                        ${category.items.map(item => `
+                            <div class="menu-card bg-white p-5 rounded-xl shadow-md flex flex-col justify-between">
+                                <div>
+                                    <div class="flex justify-between items-start mb-2">
+                                        <h4 class="text-lg font-semibold text-gray-900">${item.name}</h4>
+                                        <span class="text-xl font-bold accent-red-text">P ${item.price}</span>
+                                    </div>
+                                    ${item.description ? `<p class="text-xs text-gray-500 mt-1">${item.description}</p>` : ''}
+                                </div>
+                                <button onclick="openConfigModal('${item.id}')"
+                                    class="mt-4 accent-red text-white font-medium py-2 rounded-lg hover:bg-red-800 transition duration-150 text-sm">
+                                    Add to Cart
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- ITEM CONFIGURATION MODAL ---
+
+        function openConfigModal(itemId) {
+            const item = menuMap[itemId];
+            if (!item) return;
+
+            // Set modal content
+            modalItemNameEl.textContent = item.name;
+            modalItemPriceEl.textContent = `Price: P ${item.price.toFixed(2)}`;
+            
+            // Set hidden inputs for use in addConfiguredItemToCart
+            modalItemIdInput.value = item.id;
+            modalItemBasePriceInput.value = item.price;
+            
+            // Reset quantity and comment
+            modalQuantityInput.value = 1;
+            modalCommentInput.value = item.description || '';
+
+            // Handle optional description/options box
+            if (item.description || (item.options && item.options.length > 0)) {
+                modalOptionsContainerEl.classList.remove('hidden');
+                let optionsText = item.description || '';
+                if (item.options) {
+                    optionsText += (optionsText ? ' | ' : '') + `**Available Flavors/Options:** ${item.options.join(', ')}.`;
+                }
+                modalOptionsTextEl.innerHTML = optionsText;
+            } else {
+                modalOptionsContainerEl.classList.add('hidden');
+            }
+
+
+            // Show modal
+            configModalOverlayEl.classList.remove('hidden');
+            configModalOverlayEl.classList.add('flex');
+            setTimeout(() => {
+                configModalContentEl.classList.remove('scale-95', 'opacity-0');
+                configModalContentEl.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        function closeConfigModal() {
+            // Animate out
+            configModalContentEl.classList.remove('scale-100', 'opacity-100');
+            configModalContentEl.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                configModalOverlayEl.classList.add('hidden');
+                configModalOverlayEl.classList.remove('flex');
+            }, 300); // Match transition duration
+        }
+        
+        function changeQuantity(delta) {
+            let current = parseInt(modalQuantityInput.value) || 1;
+            let newQuantity = current + delta;
+            if (newQuantity < 1) newQuantity = 1;
+            modalQuantityInput.value = newQuantity;
+        }
+
+        function addConfiguredItemToCart() {
+            const itemId = modalItemIdInput.value;
+            const item = menuMap[itemId];
+            if (!item) {
+                console.error("Item not found in menu map:", itemId);
+                closeConfigModal();
+                return;
+            }
+
+            const quantity = parseInt(modalQuantityInput.value);
+            const comment = modalCommentInput.value.trim();
+
+            if (quantity < 1) {
+                // This should be prevented by min="1", but as a safeguard:
+                alert('Quantity must be at least 1.');
+                return;
+            }
+            
+            // Create a new unique item in the cart to allow for different comments
+            const cartItem = {
+                cartId: crypto.randomUUID(), // Unique ID for this specific cart entry
+                itemId: item.id,
+                name: item.name,
+                price: item.price,
+                quantity: quantity,
+                comment: comment,
+                timestamp: Date.now()
+            };
+
+            cart.push(cartItem);
+            updateCartDisplay();
+            closeConfigModal();
+        }
+
+        // --- CART MANAGEMENT ---
+        function removeFromCart(cartId) {
+            cart = cart.filter(item => item.cartId !== cartId);
+            updateCartDisplay();
+        }
+
+        function calculateTotals() {
+            let subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            // No tax or delivery fees applied for simplicity in this version
+            let total = subtotal; 
+            return { subtotal, total };
+        }
+
+        function updateCartDisplay() {
+            const { subtotal, total } = calculateTotals();
+            
+            cartItemsContainerEl.innerHTML = ''; // Clear previous items
+
+            if (cart.length === 0) {
+                cartItemsContainerEl.innerHTML = '<p class="text-center text-gray-500 py-4">Your cart is empty.</p>';
+            } else {
+                cart.sort((a, b) => a.timestamp - b.timestamp); // Sort by time added
+
+                cart.forEach(item => {
+                    const itemTotal = (item.price * item.quantity).toFixed(2);
+                    const commentDisplay = item.comment ? 
+                        `<p class="text-xs text-gray-600 italic mt-1 bg-gray-100 p-1 rounded-md">Note: ${item.comment}</p>` : '';
+
+                    cartItemsContainerEl.innerHTML += `
+                        <div class="flex justify-between items-center border-b pb-2">
+                            <div class="flex-grow">
+                                <p class="text-sm font-medium text-gray-900">${item.quantity} x ${item.name} <span class="text-xs text-gray-500">(P ${item.price.toFixed(2)})</span></p>
+                                ${commentDisplay}
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-sm font-semibold accent-red-text">P ${itemTotal}</span>
+                                <button onclick="removeFromCart('${item.cartId}')" class="text-red-500 hover:text-red-700 transition">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            // Update summary
+            cartSubtotalEl.textContent = `P ${subtotal.toFixed(2)}`;
+            cartTotalEl.textContent = `P ${total.toFixed(2)}`;
+            cartItemCountEl.textContent = `(${cart.length} item${cart.length !== 1 ? 's' : ''})`;
+            
+            checkOrderButtonStatus();
+        }
+
+        function checkOrderButtonStatus() {
+            const isCartNotEmpty = cart.length > 0;
+            const nameFilled = document.getElementById('customer-name').value.trim() !== '';
+            const contactFilled = document.getElementById('contact-number').value.trim() !== '';
+            const addressFilled = document.getElementById('delivery-address').value.trim() !== '';
+
+            placeOrderButtonEl.disabled = !(isCartNotEmpty && nameFilled && contactFilled && addressFilled);
+        }
+
+        // --- ORDER PLACEMENT AND FIREBASE INTERACTION ---
+
+        async function placeOrder(event) {
+            event.preventDefault();
+
+            if (placeOrderButtonEl.disabled) return;
+
+            placeOrderButtonEl.disabled = true;
+            placeOrderButtonEl.textContent = 'Placing Order...';
+
+            const customerName = document.getElementById('customer-name').value.trim();
+            const contactNumber = document.getElementById('contact-number').value.trim();
+            const address = document.getElementById('delivery-address').value.trim();
+            const { subtotal, total } = calculateTotals();
+
+            const orderData = {
+                userId: userId,
+                customerName: customerName,
+                contactNumber: contactNumber,
+                address: address,
+                orderMode: orderMode,
+                items: cart.map(item => ({
+                    id: item.itemId,
+                    name: item.name,
+                    price: item.price,
+                    quantity: item.quantity,
+                    comment: item.comment || null, // Ensure comment is included
+                    totalItemPrice: item.price * item.quantity
+                })),
+                subtotal: subtotal,
+                total: total,
+                status: 'Pending',
+                createdAt: window.firebase.serverTimestamp()
+            };
+
+            try {
+                // 1. Add order to the 'orders' collection
+                await window.firebase.addDoc(window.firebase.collection(db, ORDERS_COLLECTION), orderData);
+
+                // 2. Show success modal
+                document.getElementById('modal-title').textContent = 'Order Placed!';
+                document.getElementById('modal-message').textContent = `Thank you, ${customerName}! Your ${orderMode.replace('_', '-')} order (P ${total.toFixed(2)}) has been submitted to the kitchen.`;
+                document.getElementById('modal-icon').innerHTML = '<svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+                
+                showModal();
+
+                // 3. Clear the cart and reset form after placing the order
+                cart = [];
+                orderForm.reset();
+                updateCartDisplay();
+            } catch (e) {
+                console.error("Error placing order:", e);
+                // Show error modal
+                document.getElementById('modal-title').textContent = 'Order Failed';
+                document.getElementById('modal-message').textContent = 'An error occurred while submitting your order. Please check your connection and try again.';
+                document.getElementById('modal-icon').innerHTML = '<svg class="w-16 h-16 mx-auto text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+                showModal();
+            } finally {
+                placeOrderButtonEl.disabled = false;
+                placeOrderButtonEl.textContent = 'Place Order';
+            }
+        }
+
+        /**
+         * Displays the confirmation modal with animation.
+         */
+        function showModal() {
+            modalOverlayEl.classList.remove('hidden');
+            modalOverlayEl.classList.add('flex');
+            // Animate in
+            setTimeout(() => {
+                modalContentEl.classList.remove('scale-95', 'opacity-0');
+                modalContentEl.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        /**
+         * Closes the confirmation modal with animation.
+         */
+        function closeModal() {
+            // Animate out
+            modalContentEl.classList.remove('scale-100', 'opacity-100');
+            modalContentEl.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modalOverlayEl.classList.add('hidden');
+                modalOverlayEl.classList.remove('flex');
+            }, 300); // Match transition duration
+        }
+
+        // --- INITIALIZATION ---
+        window.onload = () => {
+            initializeFirebase();
+            renderMenu();
+            setOrderMode('TAKE_OUT'); // Default mode
+
+            // Listen for changes in form fields to update button status
+            orderForm.addEventListener('input', checkOrderButtonStatus);
+            orderForm.addEventListener('submit', placeOrder);
+
+            // Export functions to window scope for inline HTML event handlers to work
+            window.removeFromCart = removeFromCart;
+            window.closeModal = closeModal;
+            window.setOrderMode = setOrderMode; 
+            window.openConfigModal = openConfigModal;
+            window.closeConfigModal = closeConfigModal;
+            window.changeQuantity = changeQuantity;
+            window.addConfiguredItemToCart = addConfiguredItemToCart;
+            
+            updateCartDisplay();
+        };
+    </script>
+</body>
+</html>
